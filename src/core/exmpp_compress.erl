@@ -215,7 +215,7 @@ get_prefered_engine(Compress_Method) ->
         [Engine | _] -> Engine
     end.
 
-%% @spec (Engine_Name) -> bool()
+%% @spec (Engine_Name) -> boolean()
 %%     Engine_Name = atom()
 %% @doc Tell if `Engine_Name' is available.
 

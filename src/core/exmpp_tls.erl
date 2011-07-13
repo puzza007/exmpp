@@ -237,7 +237,7 @@ get_prefered_engine_name(Auth_Method) ->
         [Engine | _] -> Engine#tls_engine.name
     end.
 
-%% @spec (Engine_Name) -> bool()
+%% @spec (Engine_Name) -> boolean()
 %%     Engine_Name = atom()
 %% @doc Tell if `Engine_Name' is available.
 
@@ -270,7 +270,7 @@ get_engine_driver(Engine_Name) ->
 %%     Auth_Method = atom()
 %%     Certificate = string()
 %%     Private_Key = string()
-%%     Peer_Verification = bool() | Peer_Name
+%%     Peer_Verification = boolean() | Peer_Name
 %%     Peer_Name = string()
 %%     Options = [Option]
 %%     Option = {engine, Engine} | {mode, Mode} | {trusted_certs, Auth_Method, Certs} | peer_cert_required | accept_expired_cert | accept_revoked_cert | accept_non_trusted_cert | accept_corrupted_cert
@@ -290,7 +290,7 @@ connect(Socket_Desc, Identity, Peer_Verification, Options) ->
 %%     Auth_Method = atom()
 %%     Certificate = string()
 %%     Private_Key = string()
-%%     Peer_Verification = bool() | Peer_Name
+%%     Peer_Verification = boolean() | Peer_Name
 %%     Peer_Name = string()
 %%     Options = [Option]
 %%     Option = {engine, Engine} | {mode, Mode} | {trusted_certs, {Auth_Method, Certs}} | peer_cert_required | accept_expired_cert | accept_revoked_cert | accept_non_trusted_cert | accept_corrupted_cert
