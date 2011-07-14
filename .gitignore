@@ -13,8 +13,6 @@ configure
 doc/edoc-info
 doc/erlang.png
 doc/*.html
-ebin/exmpp.app
-ebin/exmpp.appup
 ebin/*.beam
 include/internal/exmpp_known_attrs.hrl
 include/internal/exmpp_known_elems.hrl
@@ -30,3 +28,8 @@ src/exmpp_known_elems.erl
 src/exmpp_known_nss.erl
 stamp-h1
 testsuite/etest
+c_src/*.o
+src/core/exmpp_known_attrs.erl
+src/core/exmpp_known_elems.erl
+src/core/exmpp_known_nss.erl
+priv/
