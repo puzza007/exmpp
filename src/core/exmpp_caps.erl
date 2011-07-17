@@ -158,9 +158,7 @@ fields(#field{var = Var, values = Values}) ->
 fields(Fields) when is_list(Fields) ->
     lists:foldl(
       fun(#field{} = Field, String) -> String ++ fields(Field) end,
-      "", lists:sort(Fields));
-fields(_) ->
-    throw({exmpp_caps, fields, 'Fields : field() | [field()]'}).
+      "", lists:sort(Fields)).
 
 
 %% @spec (Values) -> String
@@ -218,6 +216,4 @@ identities(_) ->
 -spec(hash_caps/1 :: (string()) -> hash()).
 
 hash_caps(String) when is_list(String)->
-    base64:encode(crypto:sha(unicode:characters_to_list(String)));
-hash_caps(_) ->
-    throw({exmpp_caps, hash_caps, 'String : string()'}).
+    base64:encode(crypto:sha(unicode:characters_to_list(String))).

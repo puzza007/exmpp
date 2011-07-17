@@ -42,7 +42,6 @@ srv_lookup(Name, Domain, DefaultPort, Retries) when Retries < 1 ->
       %% srv lookup failed, so create a fake result
       {ok, #hostent{h_name=Name,
                     h_aliases=[],
-                    h_addrtype=srv,
                     h_length=1,
                     h_addr_list=[{0, 0, DefaultPort, Domain}]}};
 

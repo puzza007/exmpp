@@ -199,7 +199,7 @@ gen_send({Mod, Socket}, Packet) ->
 %% @doc Wrapper to abstract the `getopts' function of multiple communication
 %% modules.
 
--spec(gen_getopts/2 :: ({atom(), any()}, list()) -> list() | {error, any()}).
+-spec(gen_getopts/2 :: ({atom(), any()}, list()) -> {ok, list()} | {error, any()}).
 
 gen_getopts({gen_tcp, Socket}, Options) ->
     inet:getopts(Socket, Options);

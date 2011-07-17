@@ -49,7 +49,8 @@ new(CallbackPid) ->
     new(CallbackPid, infinity).
 
 new(CallbackPid, MaxSize) ->
-    exmpp_xmlstream:start({gen_fsm, CallbackPid}, [{maxsize, MaxSize}]).
+    exmpp_xmlstream:start({gen_fsm, CallbackPid},
+                          exmpp_xml:start_parser([{max_size, MaxSize}])).
 
 %% @doc Deprecated for {@link exmpp_xmlstream:parse/2}.
 %% ```

@@ -801,11 +801,11 @@ retract(Service, Node, ItemID) ->
 retract(Id, Service, Node, ItemID) ->
     Item = exmpp_xml:set_attribute(
 	   #xmlel{ns = ?NS_PUBSUB, name = 'item'},
-	   {<<"id">>, ItemID}),
-    Retract = exmpp_xml:set_attributes(
+	   <<"id">>, ItemID),
+    Retract = exmpp_xml:set_attribute(
 	    #xmlel{ns = ?NS_PUBSUB, name = 'retract',
-	    children = [Item]}, [
-	    {<<"node">>, Node}]),
+	    children = [Item]},
+	    <<"node">>, Node),
     Pubsub = ?PUBSUB(?NS_PUBSUB, [Retract]),
     Iq = ?IQ_SET(Service, Id),
     exmpp_xml:append_child(Iq, Pubsub). 
