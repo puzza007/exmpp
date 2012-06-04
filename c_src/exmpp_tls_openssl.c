@@ -21,7 +21,12 @@
 
 #include "exmpp_tls.h"
 
+#if (defined(__MACH__) && defined(__APPLE__))
+#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 #define	DRIVER_NAME	exmpp_tls_openssl
+#define CIPHERS         "DEFAULT:!EXPORT:!LOW:!SSLv2"
 
 #define	BUF_SIZE	1024
 
@@ -57,6 +62,57 @@ static int	verify_callback(int preverify_ok, X509_STORE_CTX *x509_ctx);
 
 static int	ssl_ex_index;
 
+#ifndef OPENSSL_NO_DH
+/*
+1024-bit MODP Group with 160-bit prime order subgroup (RFC5114)
+-----BEGIN DH PARAMETERS-----
+MIIBDAKBgQCxC4+WoIDgHd6S3l6uXVTsUsmfvPsGo8aaap3KUtI7YWBz4oZ1oj0Y
+mDjvHi7mUsAT7LSuqQYRIySXXDzUm4O/rMvdfZDEvXCYSI6cIZpzck7/1vrlZEc4
++qMaT/VbzMChUa9fDci0vUW/N982XBpl5oz9p21NpwjfH7K8LkpDcQKBgQCk0cvV
+w/00EmdlpELvuZkF+BBN0lisUH/WQGz/FCZtMSZv6h5cQVZLd35pD1UE8hMWAhe0
+sBuIal6RVH+eJ0n01/vX07mpLuGQnQ0iY/gKdqaiTAh6CR9THb8KAWm2oorWYqTR
+jnOvoy13nVkY0IvIhY9Nzvl8KiSFXm7rIrOy5QICAKA=
+-----END DH PARAMETERS-----
+ */
+static unsigned char dh1024_p[] = {
+        0xB1,0x0B,0x8F,0x96,0xA0,0x80,0xE0,0x1D,0xDE,0x92,0xDE,0x5E,
+        0xAE,0x5D,0x54,0xEC,0x52,0xC9,0x9F,0xBC,0xFB,0x06,0xA3,0xC6,
+        0x9A,0x6A,0x9D,0xCA,0x52,0xD2,0x3B,0x61,0x60,0x73,0xE2,0x86,
+        0x75,0xA2,0x3D,0x18,0x98,0x38,0xEF,0x1E,0x2E,0xE6,0x52,0xC0,
+        0x13,0xEC,0xB4,0xAE,0xA9,0x06,0x11,0x23,0x24,0x97,0x5C,0x3C,
+        0xD4,0x9B,0x83,0xBF,0xAC,0xCB,0xDD,0x7D,0x90,0xC4,0xBD,0x70,
+        0x98,0x48,0x8E,0x9C,0x21,0x9A,0x73,0x72,0x4E,0xFF,0xD6,0xFA,
+        0xE5,0x64,0x47,0x38,0xFA,0xA3,0x1A,0x4F,0xF5,0x5B,0xCC,0xC0,
+        0xA1,0x51,0xAF,0x5F,0x0D,0xC8,0xB4,0xBD,0x45,0xBF,0x37,0xDF,
+        0x36,0x5C,0x1A,0x65,0xE6,0x8C,0xFD,0xA7,0x6D,0x4D,0xA7,0x08,
+        0xDF,0x1F,0xB2,0xBC,0x2E,0x4A,0x43,0x71,
+};
+static unsigned char dh1024_g[] = {
+        0xA4,0xD1,0xCB,0xD5,0xC3,0xFD,0x34,0x12,0x67,0x65,0xA4,0x42,
+        0xEF,0xB9,0x99,0x05,0xF8,0x10,0x4D,0xD2,0x58,0xAC,0x50,0x7F,
+        0xD6,0x40,0x6C,0xFF,0x14,0x26,0x6D,0x31,0x26,0x6F,0xEA,0x1E,
+        0x5C,0x41,0x56,0x4B,0x77,0x7E,0x69,0x0F,0x55,0x04,0xF2,0x13,
+        0x16,0x02,0x17,0xB4,0xB0,0x1B,0x88,0x6A,0x5E,0x91,0x54,0x7F,
+        0x9E,0x27,0x49,0xF4,0xD7,0xFB,0xD7,0xD3,0xB9,0xA9,0x2E,0xE1,
+        0x90,0x9D,0x0D,0x22,0x63,0xF8,0x0A,0x76,0xA6,0xA2,0x4C,0x08,
+        0x7A,0x09,0x1F,0x53,0x1D,0xBF,0x0A,0x01,0x69,0xB6,0xA2,0x8A,
+        0xD6,0x62,0xA4,0xD1,0x8E,0x73,0xAF,0xA3,0x2D,0x77,0x9D,0x59,
+        0x18,0xD0,0x8B,0xC8,0x85,0x8F,0x4D,0xCE,0xF9,0x7C,0x2A,0x24,
+        0x85,0x5E,0x6E,0xEB,0x22,0xB3,0xB2,0xE5,
+};
+
+static DH *dh1024;
+#endif
+
+/*
+ * ECDHE is enabled only on OpenSSL 1.0.0e and later.
+ * See http://www.openssl.org/news/secadv_20110906.txt
+ * for details.
+ */
+#if OPENSSL_VERSION_NUMBER >= 0x1000005fL && !defined(OPENSSL_NO_ECDH)
+static EC_KEY *ecdh;
+#endif
+
 #define	COPY_AND_FREE_BUF(to_send, size, b, ret)			\
 	(size) = (to_send)->index + 1;					\
 	(b) = driver_alloc_binary((size));				\
@@ -82,19 +138,7 @@ exmpp_tls_openssl_start(ErlDrvPort port, char *command)
 	if (edd == NULL)
 		return (NULL);
 
-	edd->mode = TLS_MODE_UNKNOWN;
-	edd->certificate = edd->private_key = NULL;
-	edd->verify_peer = 0;
-	edd->expected_id = NULL;
-	edd->trusted_certs = NULL;
-	edd->peer_cert_required = 0;
-	edd->accept_expired_cert = 0;
-	edd->accept_revoked_cert = 0;
-	edd->accept_non_trusted_cert = 0;
-	edd->accept_corrupted_cert = 0;
-
-	edd->ctx = NULL;
-	edd->ssl = NULL;
+	memset(edd, 0, sizeof(*edd));
 
 	return (ErlDrvData)edd;
 }
@@ -112,13 +156,19 @@ exmpp_tls_openssl_stop(ErlDrvData drv_data)
 		driver_free(edd->private_key);
 	if (edd->expected_id != NULL)
 		driver_free(edd->expected_id);
+	if (edd->trusted_certs != NULL)
+		driver_free(edd->trusted_certs);
+	if (edd->ssl != NULL)
+		SSL_free(edd->ssl);
+	if (edd->ctx != NULL)
+		SSL_CTX_free(edd->ctx);
 
 	driver_free(edd);
 }
 
-static int
+static ErlDrvSSizeT
 exmpp_tls_openssl_control(ErlDrvData drv_data, unsigned int command,
-    char *buf, int len, char **rbuf, int rlen)
+    char *buf, ErlDrvSizeT len, char **rbuf, ErlDrvSizeT rlen)
 {
 	struct exmpp_tls_openssl_data *edd;
 	int ret, index, arity, type, type_size, flag;
@@ -381,39 +431,26 @@ exmpp_tls_openssl_control(ErlDrvData drv_data, unsigned int command,
 		break;
 	case COMMAND_GET_ENCRYPTED_OUTPUT:
 		/* Allocate binary to copy encrypted data. */
-		size = BUF_SIZE + 1;
-		rlen = 1;
+		size = BIO_ctrl_pending(edd->bio_write) + 1;
 		b = driver_alloc_binary(size);
 		b->orig_bytes[0] = RET_OK;
 
-		/* Copy data. */
-		while ((ret = BIO_read(edd->bio_write,
-		    b->orig_bytes + rlen, BUF_SIZE)) > 0) {
-			rlen += ret;
-			size += BUF_SIZE;
-			b = driver_realloc_binary(b, size);
-		}
-
-		size = rlen;
-		b = driver_realloc_binary(b, size);
+		BIO_read(edd->bio_write, b->orig_bytes + 1, size - 1);
 
 		break;
 	case COMMAND_GET_PEER_CERTIFICATE:
 		/* Get the peer certificate. */
 		cert = SSL_get_peer_certificate(edd->ssl);
-		if (cert == NULL) {
+		if (cert == NULL || (rlen = i2d_X509(cert, NULL)) < 0) {
 			to_send = exmpp_new_xbuf();
 			if (to_send == NULL)
 				return (-1);
 			ei_x_encode_atom(to_send, "no_certificate");
 
 			COPY_AND_FREE_BUF(to_send, size, b, RET_ERROR);
-		}
-
-		/* Calculate the size of the certificate. */
-		rlen = i2d_X509(cert, NULL);
-		if (rlen < 0) {
-			X509_free(cert);
+			if (cert != NULL) {
+				X509_free(cert);
+			}
 			break;
 		}
 
@@ -508,6 +545,22 @@ exmpp_tls_openssl_control(ErlDrvData drv_data, unsigned int command,
 		COPY_AND_FREE_BUF(to_send, size, b, RET_ERROR);
 
 		break;
+	case COMMAND_GET_PEER_FINISHED:
+		size = BUF_SIZE + 1;
+		b = driver_alloc_binary(size);
+		b->orig_bytes[0] = RET_OK;
+		ret = SSL_get_peer_finished(edd->ssl, &(b->orig_bytes[1]), BUF_SIZE);
+		size = ret + 1;
+		b = driver_realloc_binary(b, size);
+		break;
+	case COMMAND_GET_FINISHED:
+		size = BUF_SIZE + 1;
+		b = driver_alloc_binary(size);
+		b->orig_bytes[0] = RET_OK;
+		ret = SSL_get_finished(edd->ssl, &(b->orig_bytes[1]), BUF_SIZE);
+		size = ret + 1;
+		b = driver_realloc_binary(b, size);
+		break;
 	default:
 		/* Commad not recognized. */
 		to_send = exmpp_new_xbuf();
@@ -554,6 +607,39 @@ init_library(struct exmpp_tls_openssl_data *edd,
 
 		goto err;
 	}
+
+	// SSL 2.0 is deprecated for many years
+	SSL_CTX_set_options(edd->ctx, SSL_OP_NO_SSLv2);
+
+	SSL_CTX_set_cipher_list(edd->ctx, CIPHERS);
+
+	/*
+	 * Since sessions are cached in SSL_CTX and currently new context
+	 * is used for every connection, then session caching makes little
+	 * sense, turn it off.
+	 */
+	SSL_CTX_set_session_cache_mode(edd->ctx, SSL_SESS_CACHE_OFF);
+	SSL_CTX_set_options(edd->ctx, SSL_OP_NO_TICKET);
+#ifdef SSL_MODE_RELEASE_BUFFERS
+	/*
+	 * This appeared in OpenSSL 1.0.0,
+	 * reduces memory usage on idle connections.
+	 */
+	SSL_CTX_set_mode(edd->ctx, SSL_MODE_RELEASE_BUFFERS);
+#endif
+
+#ifndef OPENSSL_NO_DH
+	if (dh1024 != NULL && edd->mode == TLS_MODE_SERVER) {
+		SSL_CTX_set_options(edd->ctx, SSL_OP_SINGLE_DH_USE);
+		SSL_CTX_set_tmp_dh(edd->ctx, dh1024);
+	}
+#endif
+#if OPENSSL_VERSION_NUMBER >= 0x1000005fL && !defined(OPENSSL_NO_ECDH)
+	if (ecdh != NULL && edd->mode == TLS_MODE_SERVER) {
+		SSL_CTX_set_options(edd->ctx, SSL_OP_SINGLE_ECDH_USE);
+		SSL_CTX_set_tmp_ecdh(edd->ctx, ecdh);
+	}
+#endif
 
 	/* Set our certificate. */
 	if (edd->certificate != NULL) {
@@ -648,10 +734,14 @@ init_library(struct exmpp_tls_openssl_data *edd,
 	return (0);
 
 err:
-	if (edd->ssl != NULL)
+	if (edd->ssl != NULL) {
 		SSL_free(edd->ssl);
-	if (edd->ctx != NULL)
+		edd->ssl = NULL;
+	}
+	if (edd->ctx != NULL) {
 		SSL_CTX_free(edd->ctx);
+		edd->ctx = NULL;
+	}
 
 	return (-1);
 }
@@ -826,7 +916,6 @@ static ErlDrvEntry tls_openssl_driver_entry = {
 
 DRIVER_INIT(DRIVER_NAME)
 {
-
 	/* Initialize OpenSSL. */
 	SSL_library_init();
 	SSL_load_error_strings();
@@ -840,6 +929,47 @@ DRIVER_INIT(DRIVER_NAME)
 	 */
 	ssl_ex_index = SSL_get_ex_new_index(0, "exmpp_tls_openssl_data",
 	    NULL, NULL, NULL);
+
+#ifndef OPENSSL_NO_DH
+	// Initialize ephemeral Diffie-Hellman parameters.
+	dh1024 = DH_new();
+	if (dh1024 != NULL) {
+		dh1024->p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
+		dh1024->g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
+		if (dh1024->p == NULL || dh1024->g == NULL) {
+			DH_free(dh1024);
+			dh1024 = NULL;
+		}
+	}
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x1000005fL && !defined(OPENSSL_NO_ECDH)
+	ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+#endif
+
+	tls_openssl_driver_entry.extended_marker = ERL_DRV_EXTENDED_MARKER;
+	tls_openssl_driver_entry.major_version = ERL_DRV_EXTENDED_MAJOR_VERSION;
+	tls_openssl_driver_entry.minor_version = ERL_DRV_EXTENDED_MINOR_VERSION;
+#if defined(SMP_SUPPORT)
+	/**
+	 * To make OpenSSL thread-safe, two callbacks must be set
+	 * as described in http://www.openssl.org/docs/crypto/threads.html
+	 *
+	 * However, OTP comes with crypto module, that links with OpenSSL
+	 * and sets the needed callbacks itself. If another set of
+	 * callbacks had been provided here, it would overwrite
+	 * or be overwritten by those from crypto module.
+	 *
+	 * So instead of providing callbacks, start crypto module
+	 * from Erlang code before loading this driver. As a result
+	 * crypto module will install the needed callbacks and
+	 * this driver also can be made thread safe.
+	 */
+	if (CRYPTO_get_locking_callback() != NULL &&
+	    CRYPTO_get_id_callback() != NULL) {
+		tls_openssl_driver_entry.driver_flags = ERL_DRV_FLAG_USE_PORT_LOCKING;
+	}
+#endif
 
 	return &tls_openssl_driver_entry;
 }

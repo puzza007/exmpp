@@ -41,6 +41,18 @@ struct exmpp_compress_zlib_data {
 	    (to_send)->index);						\
 	exmpp_free_xbuf((to_send));
 
+static void*
+exmpp_compress_zlib_alloc(void *opaque, unsigned int items, unsigned int size)
+{
+	return driver_alloc(items*size);
+}
+
+static void
+exmpp_compress_zlib_free(void *opaque, void *addr)
+{
+	driver_free(addr);
+}
+
 /* -------------------------------------------------------------------
  * Erlang port driver callbacks.
  * ------------------------------------------------------------------- */
@@ -63,8 +75,8 @@ exmpp_compress_zlib_start(ErlDrvPort port, char *command)
 
 	edd->inf_z.next_in  = edd->def_z.next_in  = 0;
 	edd->inf_z.avail_in = edd->def_z.avail_in = 0;
-	edd->inf_z.zalloc   = edd->def_z.zalloc   = NULL;
-	edd->inf_z.zfree    = edd->def_z.zfree    = NULL;
+	edd->inf_z.zalloc   = edd->def_z.zalloc   = exmpp_compress_zlib_alloc;
+	edd->inf_z.zfree    = edd->def_z.zfree    = exmpp_compress_zlib_free;
 	edd->inf_z.opaque   = edd->def_z.opaque   = NULL;
 
 	return (ErlDrvData)edd;
@@ -83,9 +95,9 @@ exmpp_compress_zlib_stop(ErlDrvData drv_data)
 	driver_free(edd);
 }
 
-static int
+static ErlDrvSSizeT
 exmpp_compress_zlib_control(ErlDrvData drv_data, unsigned int command,
-    char *buf, int len, char **rbuf, int rlen)
+    char *buf, ErlDrvSizeT len, char **rbuf, ErlDrvSizeT rlen)
 {
 	struct exmpp_compress_zlib_data *edd;
 	int ret, index, type, type_size;
@@ -336,6 +348,11 @@ static ErlDrvEntry compress_zlib_driver_entry = {
 
 DRIVER_INIT(DRIVER_NAME)
 {
-
+	compress_zlib_driver_entry.extended_marker = ERL_DRV_EXTENDED_MARKER;
+	compress_zlib_driver_entry.major_version = ERL_DRV_EXTENDED_MAJOR_VERSION;
+	compress_zlib_driver_entry.minor_version = ERL_DRV_EXTENDED_MINOR_VERSION;
+#if defined(SMP_SUPPORT)
+	compress_zlib_driver_entry.driver_flags = ERL_DRV_FLAG_USE_PORT_LOCKING;
+#endif
 	return &compress_zlib_driver_entry;
 }

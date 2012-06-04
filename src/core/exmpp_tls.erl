@@ -49,7 +49,9 @@
 	 shutdown/1,
 	 shutdown/2,
 	 shutdown/3,
-	 quiet_shutdown/1
+	 quiet_shutdown/1,
+	 get_peer_finished/1,
+	 get_finished/1
 	]).
 
 %% Common socket API.
@@ -114,6 +116,8 @@
 -define(COMMAND_SHUTDOWN,             14).
 -define(COMMAND_QUIET_SHUTDOWN,       15).
 -define(COMMAND_PORT_REVISION,        16).
+-define(COMMAND_GET_PEER_FINISHED,    17).
+-define(COMMAND_GET_FINISHED,         18).
 
 %% --------------------------------------------------------------------
 %% Initialization.
@@ -135,6 +139,11 @@ start_link() ->
 
 -ifdef(HAVE_OPENSSL).
 -define(REGISTER_OPENSSL,
+	%% crypto module installs various global OpenSSL callbacks
+	%% that make OpenSSL thread-safe. The OpenSSL driver will
+	%% detect and make use of it, so ensure that crypto is
+	%% started before loading the driver.
+	crypto:start(),
 	register_builtin_engine(openssl, exmpp_tls_openssl,
 				[{x509, 10}])).
 -else.
@@ -430,20 +439,41 @@ handshake2(server = Mode, Socket_Desc, Port, Recv_Timeout) ->
 
 %% @spec (TLS_Socket) -> Certificate | undefined
 %%     TLS_Socket = tls_socket()
-%%     Certificate = binary()
+%%     Certificate = certificate()
+%%     Reason = term()
+%% @throws {tls, peer_certificate, decode_failed, Reason}
 %% @doc Return the peer certificate if he provided one.
+%%
+%% Note that a client will only send a certificate when requested by a server.
+%% This means that in the server case, this function will return anything
+%% only when peer verification is enabled.
+%%
+%% Certificate is returned as a
+%% <a href="http://erlang.org/doc/apps/public_key/cert_records.html">
+%% public_key certificate record</a>.
 
 get_peer_certificate(#tls_socket{port = Port}) ->
     case engine_get_peer_certificate(Port) of
         undefined ->
             undefined;
         Bin_Cert ->
-            case public_key:pkix_decode_cert(Bin_Cert, plain) of
-                {ok, Cert} ->
-                    Cert;
-                {error, Reason} ->
-                    throw({tls, peer_certificate, decode_failed, Reason})
-            end
+	    try
+		case public_key:pkix_decode_cert(Bin_Cert, plain) of
+		    {ok, Cert} ->
+			%% R13 and earlier
+			Cert;
+		    {error, Reason} ->
+			%% R13 and earlier
+			throw({tls, peer_certificate, decode_failed, Reason});
+		    Certificate ->
+			%% starting from R14, pkix_decode_cert/2 simply returns
+			%% decoded certificate and uses erlang:error/1 for errors
+			Certificate
+		end
+	    catch
+		_:Exception ->
+		    throw({tls, peer_certificate, decode_failed, Exception})
+	    end
     end.
 
 %% @spec (TLS_Socket) -> Result
@@ -549,6 +579,28 @@ quiet_shutdown(#tls_socket{socket = Socket_Desc, port = Port}) ->
     engine_quiet_shutdown(Port),
     exmpp_internals:close_port(Port),
     Socket_Desc.
+
+%% @spec (TLS_Socket) -> Finished
+%%     TLS_Socket = tls_socket()
+%%     Finished = binary()
+%% @doc Retrieve latest "Finished" message (received on this side).
+%%
+%% "Finished" message is needed for tls-unique channel binding,
+%% used for example by SCRAM-SHA-1-PLUS SASL method.
+
+get_peer_finished(#tls_socket{port = Port}) ->
+    engine_get_peer_finished(Port).
+
+%% @spec (TLS_Socket) -> Finished
+%%     TLS_Socket = tls_socket()
+%%     Finished = binary()
+%% @doc Retrieve latest "Finished" message (sent out from this side).
+%%
+%% "Finished" message is needed for tls-unique channel binding,
+%% used for example by SCRAM-SHA-1-PLUS SASL method.
+
+get_finished(#tls_socket{port = Port}) ->
+    engine_get_finished(Port).
 
 %% --------------------------------------------------------------------
 %% Handshake helpers.
@@ -994,6 +1046,22 @@ engine_port_revision(Port) ->
             throw({tls, port_revision, port_revision, Reason});
         Revision ->
             binary_to_term(Revision)
+    end.
+
+engine_get_peer_finished(Port) ->
+    case control(Port, ?COMMAND_GET_PEER_FINISHED, <<>>) of
+	{error, Reason} ->
+	    throw({tls, get_peer_finished, get_peer_finished, Reason});
+	Result ->
+	    Result
+    end.
+
+engine_get_finished(Port) ->
+    case control(Port, ?COMMAND_GET_FINISHED, <<>>) of
+	{error, Reason} ->
+	    throw({tls, get_finished, get_finished, Reason});
+	Result ->
+	    Result
     end.
 
 %% --------------------------------------------------------------------

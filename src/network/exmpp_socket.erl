@@ -11,7 +11,7 @@
 %% the License for the specific language governing rights and limitations
 %% under the License.
 
-%% @author Emilio Bustos <mickael.remond@process-one.net>
+%% @author Emilio Bustos <emilionicolas@gmail.com>
 
 %% @doc
 %% The module <strong>{@module}</strong> manages TCP/IP socket
@@ -24,7 +24,7 @@
 -module(exmpp_socket).
 
 -export([connect/3, send/2, close/2, reset_parser/1, get_property/2,
-        compress/1, starttls/2
+        compress/1, starttls/2, wping/1
     ]).
 
 %% Internal export
@@ -82,6 +82,9 @@ send(Socket, XMLPacket) when is_tuple(XMLPacket) ->
     Bin = exmpp_xml:document_to_binary(XMLPacket),
  %     io:format("- SENDING:~n~s~n", [Bin]),
     exmpp_internals:gen_send(Socket, Bin).
+
+wping(Socket) ->
+	exmpp_internals:gen_send(Socket, <<"\n">>).
 
 compress(ReceiverPid) ->
     Ref = erlang:make_ref(),

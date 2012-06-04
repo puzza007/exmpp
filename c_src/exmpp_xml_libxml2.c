@@ -71,8 +71,20 @@ exmpp_xml_init()
 	if (init_known_lists() != 0)
 		return (-1);
 
+	if (xmlMemSetup(driver_free, driver_alloc,
+			driver_realloc, exmpp_strdup) != 0) {
+		return (-1);
+	}
+
 	/* Initialize and check LibXML2. */
 	LIBXML_TEST_VERSION; /* be safe, plus calls xmlInitParser */
+
+	/* Initialize SAX callbacks. */
+	sax_handler.initialized = XML_SAX2_MAGIC;
+	sax_handler.startElementNs = libxml2_cb_start_element;
+	sax_handler.endElementNs = libxml2_cb_end_element;
+	sax_handler.getEntity = libxml2_cb_get_entity;
+	sax_handler.characters = libxml2_cb_character_data;
 
 	return (0);
 }
@@ -132,9 +144,9 @@ exmpp_xml_stop(ErlDrvData drv_data)
 	driver_free(edd);
 }
 
-static int
+static ErlDrvSSizeT
 exmpp_xml_control(ErlDrvData drv_data, unsigned int command,
-    char *buf, int len, char **rbuf, int rlen)
+    char *buf, ErlDrvSizeT len, char **rbuf, ErlDrvSizeT rlen)
 {
 	struct exmpp_xml_data *edd;
 	ei_x_buff *to_return;
@@ -244,6 +256,7 @@ exmpp_xml_control(ErlDrvData drv_data, unsigned int command,
 
 	case COMMAND_RESET_PARSER:
 		if (edd->parser != NULL) {
+			reset_context(&edd->ctx);
 			xmlCtxtResetPush(edd->parser, NULL, 0, NULL, NULL);
 		}
 		ret = RET_OK;
@@ -421,14 +434,6 @@ exmpp_xml_cb_make_attributes(struct exmpp_xml_ctx *ctx, void *user_data)
 static int
 create_parser(struct exmpp_xml_data *edd)
 {
-
-	/* Initialize SAX callbacks. */
-	sax_handler.initialized = XML_SAX2_MAGIC;
-	sax_handler.startElementNs = libxml2_cb_start_element;
-	sax_handler.endElementNs = libxml2_cb_end_element;
-	sax_handler.getEntity = libxml2_cb_get_entity;
-	sax_handler.characters = libxml2_cb_character_data;
-
 	/* Create a parser. */
 	edd->parser = xmlCreatePushParserCtxt(&sax_handler, edd,
 	    NULL, 0, NULL);
@@ -460,7 +465,6 @@ static ErlDrvEntry driver_entry;
 
 DRIVER_INIT(DRIVER_NAME)
 {
-
 	driver_entry.driver_name = S(DRIVER_NAME);
 	driver_entry.init = exmpp_xml_init;
 	driver_entry.finish = exmpp_xml_finish;
@@ -468,10 +472,10 @@ DRIVER_INIT(DRIVER_NAME)
 	driver_entry.stop = exmpp_xml_stop;
 	driver_entry.control = exmpp_xml_control;
 
-#if defined(SMP_SUPPORT)
 	driver_entry.extended_marker = ERL_DRV_EXTENDED_MARKER;
 	driver_entry.major_version = ERL_DRV_EXTENDED_MAJOR_VERSION;
 	driver_entry.minor_version = ERL_DRV_EXTENDED_MINOR_VERSION;
+#if defined(SMP_SUPPORT)
 	driver_entry.driver_flags = ERL_DRV_FLAG_USE_PORT_LOCKING;
 #endif
 

@@ -111,9 +111,9 @@ static int	compose(int ch1, int ch2);
  * Erlang port driver callbacks.
  * ------------------------------------------------------------------- */
 
-static int
+static ErlDrvSSizeT
 exmpp_stringprep_control(ErlDrvData drv_data, unsigned int command,
-    char *buf, int len, char **rbuf, int rlen)
+    char *buf, ErlDrvSizeT len, char **rbuf, ErlDrvSizeT rlen)
 {
 	int i, j, pos;
 	unsigned char c;
@@ -394,9 +394,15 @@ static ErlDrvEntry driver_entry;
 
 DRIVER_INIT(DRIVER_NAME)
 {
-
 	driver_entry.driver_name = S(DRIVER_NAME);
 	driver_entry.control = exmpp_stringprep_control;
+
+	driver_entry.extended_marker = ERL_DRV_EXTENDED_MARKER;
+	driver_entry.major_version = ERL_DRV_EXTENDED_MAJOR_VERSION;
+	driver_entry.minor_version = ERL_DRV_EXTENDED_MINOR_VERSION;
+#if defined(SMP_SUPPORT)
+	driver_entry.driver_flags = ERL_DRV_FLAG_USE_PORT_LOCKING;
+#endif
 
 	return (&driver_entry);
 }

@@ -49,6 +49,9 @@ static int		create_parser(struct exmpp_xml_data *edd);
 static void		init_parser(struct exmpp_xml_data *edd);
 static void		destroy_parser(struct exmpp_xml_data *edd);
 
+static XML_Memory_Handling_Suite memory_suite;
+static XML_Char         namespace_separator = NS_SEP;
+
 /* -------------------------------------------------------------------
  * Erlang port driver callbacks.
  * ------------------------------------------------------------------- */
@@ -60,6 +63,10 @@ exmpp_xml_init()
 	/* Initialize the global known lists. */
 	if (init_known_lists() != 0)
 		return (-1);
+
+	memory_suite.malloc_fcn = driver_alloc;
+	memory_suite.realloc_fcn = driver_realloc;
+	memory_suite.free_fcn = driver_free;
 
 	return (0);
 }
@@ -131,9 +138,9 @@ exmpp_xml_stop(ErlDrvData drv_data)
 	driver_free(edd);
 }
 
-static int
+static ErlDrvSSizeT
 exmpp_xml_control(ErlDrvData drv_data, unsigned int command,
-    char *buf, int len, char **rbuf, int rlen)
+    char *buf, ErlDrvSizeT len, char **rbuf, ErlDrvSizeT rlen)
 {
 	struct exmpp_xml_data *edd;
 	ei_x_buff *to_return;
@@ -459,9 +466,9 @@ exmpp_xml_cb_make_attributes(struct exmpp_xml_ctx *ctx, void *attributes)
 static int
 create_parser(struct exmpp_xml_data *edd)
 {
-
 	/* Create a parser. */
-	edd->parser = XML_ParserCreateNS("UTF-8", NS_SEP);
+	edd->parser = XML_ParserCreate_MM("UTF-8", &memory_suite,
+					  &namespace_separator);
 	if (edd->parser == NULL)
 		return (-1);
 
@@ -515,7 +522,6 @@ static ErlDrvEntry driver_entry;
 
 DRIVER_INIT(DRIVER_NAME)
 {
-
 	driver_entry.driver_name = S(DRIVER_NAME);
 	driver_entry.init = exmpp_xml_init;
 	driver_entry.finish = exmpp_xml_finish;
@@ -523,10 +529,10 @@ DRIVER_INIT(DRIVER_NAME)
 	driver_entry.stop = exmpp_xml_stop;
 	driver_entry.control = exmpp_xml_control;
 
-#if defined(SMP_SUPPORT)
 	driver_entry.extended_marker = ERL_DRV_EXTENDED_MARKER;
 	driver_entry.major_version = ERL_DRV_EXTENDED_MAJOR_VERSION;
 	driver_entry.minor_version = ERL_DRV_EXTENDED_MINOR_VERSION;
+#if defined(SMP_SUPPORT)
 	driver_entry.driver_flags = ERL_DRV_FLAG_USE_PORT_LOCKING;
 #endif
 
